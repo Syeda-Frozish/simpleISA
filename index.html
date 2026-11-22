@@ -9,29 +9,61 @@
 <body>
   <header>
     <h1>SimpleISA</h1>
-    <p>Custom 16-bit CPU toolchain — assembler (step 1 of the project)</p>
+    <p>Custom 16-bit CPU toolchain — assembler + single-cycle CPU</p>
   </header>
 
   <main>
+    <!-- Left column: code -->
     <section class="panel">
       <div class="panel-head">
         <h2>Assembly</h2>
-        <button id="assemble-btn">Assemble ▶</button>
+        <div class="row">
+          <select id="example">
+            <option value="sum.asm">sum.asm</option>
+            <option value="fibonacci.asm">fibonacci.asm</option>
+            <option value="array.asm">array.asm</option>
+          </select>
+          <button id="assemble-btn">Assemble</button>
+        </div>
       </div>
       <textarea id="source" spellcheck="false"></textarea>
+      <div id="errors"></div>
     </section>
 
+    <!-- Right column: CPU -->
     <section class="panel">
       <div class="panel-head">
-        <h2>Machine code</h2>
-        <span id="status"></span>
+        <h2>Single-cycle CPU</h2>
+        <div class="row">
+          <button id="step-btn" class="secondary">Step ▶</button>
+          <button id="run-btn" class="secondary">Run ▶▶</button>
+          <button id="reset-btn" class="secondary">Reset</button>
+        </div>
       </div>
-      <div id="errors"></div>
-      <table id="listing">
-        <thead><tr><th>Addr</th><th>Hex</th><th>Binary</th><th>Source</th></tr></thead>
-        <tbody></tbody>
-      </table>
-      <div id="data"></div>
+
+      <div id="status" class="status">Assemble a program to start.</div>
+
+      <h3>Program</h3>
+      <div class="scroll">
+        <table id="listing">
+          <thead><tr><th>Addr</th><th>Hex</th><th>Binary</th><th>Source</th></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+
+      <h3>This cycle <span id="cycle-title" class="muted"></span></h3>
+      <ol id="steps" class="steps"></ol>
+
+      <div class="two">
+        <div>
+          <h3>Registers</h3>
+          <div id="regs" class="cells"></div>
+        </div>
+        <div>
+          <h3>Data memory <span class="muted">[0..15]</span></h3>
+          <div id="dmem" class="cells"></div>
+        </div>
+      </div>
     </section>
   </main>
 
