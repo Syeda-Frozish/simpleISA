@@ -11,8 +11,8 @@ CS-339 Computer Architecture — semester project.
 | ISA specification (`docs/ISA_SPEC.md`) | ✅ v1.0 |
 | Assembler (`src/assembler.js`) | ✅ working, tested |
 | Single-cycle CPU (`src/singleCycle.js`) | ✅ working, tested |
-| Visualizer | ⬜ next |
-| Pipelined CPU | ⬜ |
+| Visualizer (`src/visualizer.js`) | ✅ single-cycle datapath animation |
+| Pipelined CPU | ⬜ next |
 | Comparison (CPI, stalls) | ⬜ |
 
 ## Folder structure
@@ -26,6 +26,7 @@ simpleISA/
 │   ├── assembler.js    assembly text -> machine code
 │   ├── components.js   ALU, register file, memory, control unit
 │   ├── singleCycle.js  single-cycle CPU (produces the trace)
+│   ├── visualizer.js   draws the datapath and animates the trace
 │   └── main.js         connects the page to the modules
 ├── programs/           example assembly programs (*.asm)
 ├── tests/              automated tests (npm test)

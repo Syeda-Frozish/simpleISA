@@ -1,8 +1,9 @@
 // main.js — connects the webpage to the modules.
-// Assemble -> create a CPU -> Step / Run / Reset -> show what happened.
+// Assemble -> create a CPU -> Step / Auto-play / Run / Reset -> show and animate what happened.
 
 import { assemble } from './assembler.js';
 import { SingleCycleCPU } from './singleCycle.js';
+import { Visualizer } from './visualizer.js';
 import { toSigned16 } from './isa.js';
 
 const $ = (id) => document.getElementById(id);
@@ -11,31 +12,31 @@ const errorsEl = $('errors');
 const statusEl = $('status');
 const tbody = document.querySelector('#listing tbody');
 
-let program = null; // output of assemble()
-let cpu = null;     // the running CPU
-let lastRecord = null;
+let program = null;     // output of assemble()
+let cpu = null;         // the running CPU
+let lastRecord = null;  // trace record of the last cycle
+let busy = false;       // an animation is running
+let autoPlaying = false;
+
+const viz = new Visualizer($('datapath'), $('caption'), highlightStep);
 
 // ---------------- buttons ----------------
 
 $('example').addEventListener('change', loadExample);
 $('assemble-btn').addEventListener('click', assembleSource);
-$('step-btn').addEventListener('click', () => {
-  if (!cpu || cpu.halted) return;
-  lastRecord = cpu.step();
-  render();
+$('step-btn').addEventListener('click', stepAnimated);
+$('auto-btn').addEventListener('click', toggleAutoPlay);
+$('run-btn').addEventListener('click', runToEnd);
+$('reset-btn').addEventListener('click', reset);
+$('prev-btn').addEventListener('click', () => { stopAutoPlay(); viz.prev(); });
+$('next-btn').addEventListener('click', () => { stopAutoPlay(); viz.next(); });
+$('replay-btn').addEventListener('click', async () => {
+  if (!lastRecord || busy) return;
+  busy = true;
+  await viz.replay();
+  busy = false;
 });
-$('run-btn').addEventListener('click', () => {
-  if (!cpu || cpu.halted) return;
-  const { trace } = cpu.run();
-  lastRecord = trace.at(-1) ?? lastRecord;
-  render();
-});
-$('reset-btn').addEventListener('click', () => {
-  if (!cpu) return;
-  cpu.reset();
-  lastRecord = null;
-  render();
-});
+$('speed').addEventListener('change', (e) => viz.setSpeed(e.target.value));
 
 loadExample();
 
@@ -53,10 +54,12 @@ async function loadExample() {
 }
 
 function assembleSource() {
+  stopAutoPlay();
   program = assemble(sourceEl.value);
   errorsEl.innerHTML = '';
   cpu = null;
   lastRecord = null;
+  viz.clear();
 
   if (!program.ok) {
     for (const e of program.errors) {
@@ -67,11 +70,9 @@ function assembleSource() {
     }
     statusEl.textContent = `${program.errors.length} error(s) — fix them and assemble again.`;
     statusEl.className = 'status bad';
+    for (const id of ['steps', 'regs', 'dmem']) $(id).innerHTML = '';
     tbody.innerHTML = '';
-    $('steps').innerHTML = '';
     $('cycle-title').textContent = '';
-    $('regs').innerHTML = '';
-    $('dmem').innerHTML = '';
     return;
   }
 
@@ -80,7 +81,53 @@ function assembleSource() {
   render();
 }
 
-// ---------------- drawing ----------------
+async function stepAnimated() {
+  if (!cpu || cpu.halted || busy) return;
+  busy = true;
+  lastRecord = cpu.step();
+  render();
+  await viz.play(lastRecord);
+  busy = false;
+}
+
+async function toggleAutoPlay() {
+  if (autoPlaying) return stopAutoPlay();
+  if (!cpu || cpu.halted) return;
+  autoPlaying = true;
+  $('auto-btn').textContent = 'Pause';
+  while (autoPlaying && cpu && !cpu.halted) {
+    if (!busy) await stepAnimated();
+    else await new Promise((r) => setTimeout(r, 50));
+  }
+  stopAutoPlay();
+}
+
+function stopAutoPlay() {
+  autoPlaying = false;
+  $('auto-btn').textContent = 'Auto-play';
+}
+
+function runToEnd() {
+  if (!cpu || cpu.halted) return;
+  stopAutoPlay();
+  const { trace } = cpu.run();
+  lastRecord = trace.at(-1) ?? lastRecord;
+  busy = false;
+  render();
+  if (lastRecord) viz.show(lastRecord);
+}
+
+function reset() {
+  if (!cpu) return;
+  stopAutoPlay();
+  cpu.reset();
+  lastRecord = null;
+  busy = false;
+  viz.clear();
+  render();
+}
+
+// ---------------- drawing the side panels ----------------
 
 function renderListing() {
   tbody.innerHTML = '';
@@ -107,8 +154,11 @@ function render() {
     const st = cpu.stats();
     statusEl.textContent = `HALT — finished in ${st.cycles} cycles, ${st.instructions} instructions, CPI = ${st.cpi}`;
     statusEl.className = 'status good';
+  } else if (s.cycle === 0) {
+    statusEl.textContent = `Ready · ${program.code.length} instructions loaded · PC = 0`;
+    statusEl.className = 'status';
   } else {
-    statusEl.textContent = `Cycle ${s.cycle} done · next PC = ${s.pc}`;
+    statusEl.textContent = `Cycle ${s.cycle} · next PC = ${s.pc}`;
     statusEl.className = 'status';
   }
 
@@ -116,7 +166,8 @@ function render() {
   for (const tr of tbody.querySelectorAll('tr')) {
     tr.classList.toggle('current', lastRecord !== null && Number(tr.dataset.addr) === lastRecord.pc);
   }
-  tbody.querySelector('tr.current')?.scrollIntoView({ block: 'nearest' });
+  const current = tbody.querySelector('tr.current');
+  if (current) current.parentElement.parentElement.parentElement.scrollTop = current.offsetTop - 40;
 
   // steps of the last cycle
   const steps = $('steps');
@@ -131,12 +182,6 @@ function render() {
       li.append(unit, step.caption);
       steps.appendChild(li);
     }
-    if (lastRecord.error) {
-      const li = document.createElement('li');
-      li.className = 'error';
-      li.textContent = 'ERROR: ' + lastRecord.error;
-      steps.appendChild(li);
-    }
   } else {
     $('cycle-title').textContent = '';
     steps.innerHTML = '<li class="muted">Press Step to run one instruction.</li>';
@@ -144,16 +189,16 @@ function render() {
 
   // registers
   const changedReg = lastRecord?.changes.reg?.index;
-  $('regs').innerHTML = s.regs
-    .map((v, i) => cell(`R${i}`, toSigned16(v), i === changedReg))
-    .join('');
+  $('regs').innerHTML = s.regs.map((v, i) => cell(`R${i}`, toSigned16(v), i === changedReg)).join('');
 
   // data memory 0..15
   const changedMem = lastRecord?.changes.mem?.address;
-  $('dmem').innerHTML = s.dmem
-    .slice(0, 16)
-    .map((v, i) => cell(`[${i}]`, toSigned16(v), i === changedMem))
-    .join('');
+  $('dmem').innerHTML = s.dmem.slice(0, 16).map((v, i) => cell(`[${i}]`, toSigned16(v), i === changedMem)).join('');
+}
+
+// Keep the "This cycle" list in sync with the animation.
+function highlightStep(index) {
+  $('steps').querySelectorAll('li').forEach((li, i) => li.classList.toggle('active', i === index));
 }
 
 function cell(label, value, changed) {

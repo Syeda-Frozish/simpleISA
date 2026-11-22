@@ -9,8 +9,33 @@
 <body>
   <header>
     <h1>SimpleISA</h1>
-    <p>Custom 16-bit CPU toolchain — assembler + single-cycle CPU</p>
+    <p>Custom 16-bit CPU toolchain — follow one instruction through the datapath, step by step</p>
   </header>
+
+  <!-- Datapath visualizer -->
+  <section class="panel viz">
+    <div class="panel-head">
+      <h2>Single-cycle datapath</h2>
+      <div class="row">
+        <button id="step-btn">Step ▶</button>
+        <button id="auto-btn" class="secondary">Auto-play</button>
+        <button id="run-btn" class="secondary">Run to end ▶▶</button>
+        <button id="reset-btn" class="secondary">Reset</button>
+        <span class="sep"></span>
+        <button id="prev-btn" class="secondary" title="Previous step">◀</button>
+        <button id="replay-btn" class="secondary" title="Replay this instruction">↻</button>
+        <button id="next-btn" class="secondary" title="Next step">▶</button>
+        <select id="speed" title="Animation speed">
+          <option value="slow">Slow</option>
+          <option value="normal" selected>Normal</option>
+          <option value="fast">Fast</option>
+        </select>
+      </div>
+    </div>
+    <div id="datapath"></div>
+    <div id="caption" class="caption"></div>
+    <div id="status" class="status">Assemble a program to start.</div>
+  </section>
 
   <main>
     <!-- Left column: code -->
@@ -30,20 +55,9 @@
       <div id="errors"></div>
     </section>
 
-    <!-- Right column: CPU -->
+    <!-- Right column: CPU state -->
     <section class="panel">
-      <div class="panel-head">
-        <h2>Single-cycle CPU</h2>
-        <div class="row">
-          <button id="step-btn" class="secondary">Step ▶</button>
-          <button id="run-btn" class="secondary">Run ▶▶</button>
-          <button id="reset-btn" class="secondary">Reset</button>
-        </div>
-      </div>
-
-      <div id="status" class="status">Assemble a program to start.</div>
-
-      <h3>Program</h3>
+      <h3 class="first">Program</h3>
       <div class="scroll">
         <table id="listing">
           <thead><tr><th>Addr</th><th>Hex</th><th>Binary</th><th>Source</th></tr></thead>
