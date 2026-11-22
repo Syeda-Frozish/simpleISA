@@ -31,7 +31,7 @@ All formats are exactly 16 bits. Bit 15 is the most significant bit.
 
 ### R-type (register–register)
 
-```![alt text](image.png)
+```
 | opcode | rd    | rs    | rt    | unused |
 | 15..12 | 11..9 | 8..6  | 5..3  | 2..0   |
 |   4    |   3   |   3   |   3   |   3    |

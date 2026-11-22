@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>SimpleISA</title>
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <header>
+    <h1>SimpleISA</h1>
+    <p>Custom 16-bit CPU toolchain — assembler (step 1 of the project)</p>
+  </header>
+
+  <main>
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Assembly</h2>
+        <button id="assemble-btn">Assemble ▶</button>
+      </div>
+      <textarea id="source" spellcheck="false"></textarea>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Machine code</h2>
+        <span id="status"></span>
+      </div>
+      <div id="errors"></div>
+      <table id="listing">
+        <thead><tr><th>Addr</th><th>Hex</th><th>Binary</th><th>Source</th></tr></thead>
+        <tbody></tbody>
+      </table>
+      <div id="data"></div>
+    </section>
+  </main>
+
+  <script type="module" src="src/main.js"></script>
+</body>
+</html>

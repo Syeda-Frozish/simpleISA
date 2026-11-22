@@ -1,0 +1,10 @@
+{
+  "name": "simpleisa",
+  "version": "0.1.0",
+  "description": "Custom 16-bit ISA toolchain: assembler, single-cycle & pipelined CPU simulators, and a step-by-step datapath visualizer",
+  "type": "module",
+  "scripts": {
+    "test": "node --test",
+    "asm": "node tools/asm.js"
+  }
+}
