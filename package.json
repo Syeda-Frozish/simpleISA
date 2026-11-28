@@ -5,6 +5,7 @@
   "type": "module",
   "scripts": {
     "test": "node --test",
-    "asm": "node tools/asm.js"
+    "asm": "node tools/asm.js",
+    "compare": "node tools/compare.js"
   }
 }
