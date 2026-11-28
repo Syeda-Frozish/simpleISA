@@ -12,8 +12,9 @@ CS-339 Computer Architecture — semester project.
 | Assembler (`src/assembler.js`) | ✅ working, tested |
 | Single-cycle CPU (`src/singleCycle.js`) | ✅ working, tested |
 | Visualizer (`src/visualizer.js`) | ✅ single-cycle datapath animation |
-| Pipelined CPU | ⬜ next |
-| Comparison (CPI, stalls) | ⬜ |
+| Pipelined CPU (`src/pipeline.js`) | ✅ 5 stages, stalls, flushes, tested |
+| Comparison (`src/compare.js`) | ✅ cycles, CPI, stalls, flushes, execution time |
+| Report + GitHub Pages | ⬜ next |
 
 ## Folder structure
 
@@ -27,14 +28,20 @@ simpleISA/
 │   ├── components.js   ALU, register file, memory, control unit
 │   ├── singleCycle.js  single-cycle CPU (produces the trace)
 │   ├── visualizer.js   draws the datapath and animates the trace
+│   ├── pipeline.js     5-stage pipelined CPU (stall + flush)
+│   ├── pipelineView.js draws the stage boxes and pipeline diagram
+│   ├── compare.js      runs a program on both CPUs and compares them
 │   └── main.js         connects the page to the modules
 ├── programs/           example assembly programs (*.asm)
 ├── tests/              automated tests (npm test)
 ├── tools/
 │   ├── asm.js          command-line assembler
-│   └── run.js          run a program on the CPU from the terminal
+│   ├── run.js          run a program on the single-cycle CPU
+│   ├── pipe.js         run a program on the pipelined CPU
+│   └── compare.js      comparison table for all programs (--csv for Sheets)
 └── docs/
     ├── ISA_SPEC.md     the instruction set specification
+    ├── PIPELINE.md     pipeline design, hazards, results
     └── TRACE_FORMAT.md what the CPU gives the visualizer
 ```
 
@@ -51,6 +58,18 @@ node tools/asm.js programs/sum.asm
 ```
 node tools/run.js programs/sum.asm
 node tools/run.js programs/sum.asm --trace
+```
+
+**Run a program on the pipelined CPU:**
+```
+node tools/pipe.js programs/sum.asm
+node tools/pipe.js programs/sum.asm --events
+```
+
+**Compare both CPUs on every program:**
+```
+node tools/compare.js
+node tools/compare.js --csv
 ```
 
 **Run the tests:**

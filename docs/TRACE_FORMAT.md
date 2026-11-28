@@ -61,5 +61,36 @@ Values in `values` are raw 16-bit numbers (0..65535). Use `toSigned16()` from `i
 - `stats`: `{ cycles, instructions, cpi, stalls, flushes }`
 - `stoppedBy`: `'halt'`, `'error'` or `'max-cycles'`
 
-The pipelined CPU will add a per-cycle stage view (which instruction is in IF/ID/EX/MEM/WB,
-plus stall/flush flags). That will be added here when the pipeline is built.
+## Pipelined trace record
+
+`PipelinedCPU.step()` returns one record per clock cycle:
+
+```js
+{
+  cycle: 4,
+  stages: {                         // what each stage holds THIS cycle
+    IF:  { id: 3, pc: 3, asm: 'ADDI R2, R2, -1', status: 'stall', note: '' },
+    ID:  { id: 2, pc: 2, asm: 'ADD R1, R1, R2',  status: 'stall', note: 'waits for R2' },
+    EX:  { id: 1, pc: 1, asm: 'ADDI R2, R0, 5',  status: 'ok',    note: '' },
+    MEM: { id: 0, pc: 0, asm: 'ADDI R1, R0, 0',  status: 'ok',    note: '' },
+    WB:  null                       // null = empty, { bubble: true, ... } = bubble
+  },
+  events: [                         // what happened, in stage order WB -> IF
+    { stage: 'ID', text: 'ADD R1, R1, R2: STALL, needs R2 but ADDI R2, R0, 5 (in EX) has not written it yet' }
+  ],
+  changes: { reg: null, mem: null },// same shape as single-cycle
+  stall: true,                      // ID stalled this cycle
+  flushed: 0,                       // instructions flushed this cycle
+  nextPc: 3,
+  halted: false,
+  error: null
+}
+```
+
+- `id` is a number given to every fetched instruction, in fetch order. The pipeline diagram
+  uses it as the row.
+- `status`: `'ok'`, `'stall'` (held in place this cycle) or `'flushed'` (wrong path, discarded).
+
+`run()` returns `{ trace, stats, stoppedBy }` like the single-cycle CPU. Pipelined `stats`:
+`{ cycles, instructions, cpi, stalls, flushes }`. `stalls` counts stall cycles, `flushes`
+counts flushed instructions. See docs/PIPELINE.md for the design.

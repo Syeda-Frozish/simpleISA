@@ -4,6 +4,9 @@
 import { assemble } from './assembler.js';
 import { SingleCycleCPU } from './singleCycle.js';
 import { Visualizer } from './visualizer.js';
+import { PipelinedCPU } from './pipeline.js';
+import { PipelineView } from './pipelineView.js';
+import { compare, SINGLE_CYCLE_CLOCK_PS, PIPELINE_CLOCK_PS } from './compare.js';
 import { toSigned16 } from './isa.js';
 
 const $ = (id) => document.getElementById(id);
@@ -19,6 +22,10 @@ let busy = false;       // an animation is running
 let autoPlaying = false;
 
 const viz = new Visualizer($('datapath'), $('caption'), highlightStep);
+
+let pipe = null; // the pipelined CPU (runs the same program independently)
+const pipeView = new PipelineView({ stages: $('pipe-stages'), events: $('pipe-events'), grid: $('pipe-grid') });
+const EXAMPLES = ['sum.asm', 'fibonacci.asm', 'array.asm'];
 
 // ---------------- buttons ----------------
 
@@ -37,6 +44,24 @@ $('replay-btn').addEventListener('click', async () => {
   busy = false;
 });
 $('speed').addEventListener('change', (e) => viz.setSpeed(e.target.value));
+
+$('pipe-step-btn').addEventListener('click', () => {
+  if (!pipe || pipe.halted) return;
+  pipeView.add([pipe.step()]);
+  renderPipe();
+});
+$('pipe-run-btn').addEventListener('click', () => {
+  if (!pipe || pipe.halted) return;
+  pipeView.add(pipe.run().trace);
+  renderPipe();
+});
+$('pipe-reset-btn').addEventListener('click', () => {
+  if (!pipe) return;
+  pipe.reset();
+  pipeView.reset();
+  renderPipe();
+});
+$('compare-btn').addEventListener('click', compareAll);
 
 loadExample();
 
@@ -58,8 +83,10 @@ function assembleSource() {
   program = assemble(sourceEl.value);
   errorsEl.innerHTML = '';
   cpu = null;
+  pipe = null;
   lastRecord = null;
   viz.clear();
+  pipeView.reset();
 
   if (!program.ok) {
     for (const e of program.errors) {
@@ -70,15 +97,19 @@ function assembleSource() {
     }
     statusEl.textContent = `${program.errors.length} error(s) — fix them and assemble again.`;
     statusEl.className = 'status bad';
-    for (const id of ['steps', 'regs', 'dmem']) $(id).innerHTML = '';
+    $('pipe-status').textContent = statusEl.textContent;
+    $('pipe-status').className = 'status bad';
+    for (const id of ['steps', 'regs', 'dmem', 'pipe-regs']) $(id).innerHTML = '';
     tbody.innerHTML = '';
     $('cycle-title').textContent = '';
     return;
   }
 
   cpu = new SingleCycleCPU(program);
+  pipe = new PipelinedCPU(program);
   renderListing();
   render();
+  renderPipe();
 }
 
 async function stepAnimated() {
@@ -194,6 +225,71 @@ function render() {
   // data memory 0..15
   const changedMem = lastRecord?.changes.mem?.address;
   $('dmem').innerHTML = s.dmem.slice(0, 16).map((v, i) => cell(`[${i}]`, toSigned16(v), i === changedMem)).join('');
+}
+
+// ---------------- pipelined CPU panel ----------------
+
+function renderPipe() {
+  const s = pipe.state();
+  const st = pipe.stats();
+  const el = $('pipe-status');
+  if (s.error) {
+    el.textContent = `Stopped with error at cycle ${s.cycle}: ${s.error}`;
+    el.className = 'status bad';
+  } else if (s.halted) {
+    el.textContent = `HALT — ${st.cycles} cycles, ${st.instructions} instructions, CPI = ${st.cpi.toFixed(2)}, ${st.stalls} stall cycles, ${st.flushes} flushed instructions`;
+    el.className = 'status good';
+  } else {
+    el.textContent = `Cycle ${s.cycle} · next fetch PC = ${s.pc} · completed ${st.instructions} · stalls ${st.stalls} · flushes ${st.flushes}`;
+    el.className = 'status';
+  }
+  const last = pipeView.history.at(-1);
+  const changed = last?.changes.reg?.index;
+  $('pipe-regs').innerHTML = s.regs.map((v, i) => cell(`R${i}`, toSigned16(v), i === changed)).join('');
+}
+
+// ---------------- comparison ----------------
+
+async function compareAll() {
+  const out = $('compare-out');
+  out.innerHTML = '<p class="muted">Running…</p>';
+  const rows = [];
+  for (const name of EXAMPLES) {
+    const text = await (await fetch(`programs/${name}`)).text();
+    const p = assemble(text);
+    if (p.ok) rows.push({ name, ...compare(p) });
+  }
+  // also the program currently in the editor, if it is not one of the examples
+  if (program?.ok && !EXAMPLES.some((n) => sourceEl.value.trim().startsWith(`# ${n}`))) {
+    rows.push({ name: 'your program', ...compare(program) });
+  }
+
+  const maxTime = Math.max(...rows.map((r) => r.single.timePs));
+  let html = `<table class="compare"><thead><tr>
+    <th>Program</th><th>Instructions</th><th>Single-cycle cycles</th><th>Pipelined cycles</th>
+    <th>Stalls</th><th>Flushes</th><th>Single CPI</th><th>Pipelined CPI</th>
+    <th>Single time</th><th>Pipelined time</th><th>Speedup</th><th>Same result</th></tr></thead><tbody>`;
+  for (const r of rows) {
+    html += `<tr><td>${r.name}</td><td>${r.single.instructions}</td><td>${r.single.cycles}</td><td>${r.pipelined.cycles}</td>
+      <td>${r.pipelined.stalls}</td><td>${r.pipelined.flushes}</td><td>${r.single.cpi.toFixed(2)}</td><td>${r.pipelined.cpi.toFixed(2)}</td>
+      <td>${(r.single.timePs / 1000).toFixed(1)} ns</td><td>${(r.pipelined.timePs / 1000).toFixed(1)} ns</td>
+      <td><b>${r.speedup.toFixed(2)}×</b></td><td class="${r.sameResult ? 'good' : 'bad'}">${r.sameResult ? '✓' : '✗'}</td></tr>`;
+  }
+  html += '</tbody></table>';
+
+  html += '<h3>Execution time <span class="muted">(shorter is faster)</span></h3><div class="bars">';
+  for (const r of rows) {
+    const w1 = (r.single.timePs / maxTime) * 62;
+    const w2 = (r.pipelined.timePs / maxTime) * 62;
+    html += `<div class="bar-group"><div class="bar-label">${r.name}</div>
+      <div class="bar-row"><span class="bar-key">single-cycle</span><div class="bar single" style="width:${w1}%"></div><span class="bar-val">${(r.single.timePs / 1000).toFixed(1)} ns · ${r.single.cycles} cycles × ${SINGLE_CYCLE_CLOCK_PS} ps</span></div>
+      <div class="bar-row"><span class="bar-key">pipelined</span><div class="bar piped" style="width:${w2}%"></div><span class="bar-val">${(r.pipelined.timePs / 1000).toFixed(1)} ns · ${r.pipelined.cycles} cycles × ${PIPELINE_CLOCK_PS} ps</span></div>
+    </div>`;
+  }
+  html += '</div>';
+  html += `<p class="muted small">The pipeline needs <b>more cycles</b> (stalls and flushes push its CPI above 1), but each cycle is
+    <b>4× shorter</b>, so the program still finishes sooner. With no hazards at all, the speedup would approach 4×.</p>`;
+  out.innerHTML = html;
 }
 
 // Keep the "This cycle" list in sync with the animation.

@@ -9,7 +9,7 @@
 <body>
   <header>
     <h1>SimpleISA</h1>
-    <p>Custom 16-bit CPU toolchain — follow one instruction through the datapath, step by step</p>
+    <p>Custom 16-bit CPU toolchain: single-cycle datapath animation, 5-stage pipeline, and performance comparison</p>
   </header>
 
   <!-- Datapath visualizer -->
@@ -80,6 +80,46 @@
       </div>
     </section>
   </main>
+
+  <!-- Pipelined CPU -->
+  <section class="panel wide" id="pipeline">
+    <div class="panel-head">
+      <h2>Pipelined CPU <span class="muted">· 5 stages · stall on data hazards · flush on taken branch / jump</span></h2>
+      <div class="row">
+        <button id="pipe-step-btn">Step cycle ▶</button>
+        <button id="pipe-run-btn" class="secondary">Run to end ▶▶</button>
+        <button id="pipe-reset-btn" class="secondary">Reset</button>
+      </div>
+    </div>
+    <div id="pipe-status" class="status">Assemble a program to start.</div>
+
+    <div id="pipe-stages" class="pipe-stages"></div>
+
+    <h3>This cycle</h3>
+    <ol id="pipe-events" class="steps"></ol>
+
+    <h3>Pipeline diagram <span class="muted">· rows = instructions, columns = cycles · <b class="k-stall">ID*</b> stalled · <b class="k-flush">✕</b> flushed</span></h3>
+    <div id="pipe-grid" class="pipe-grid-wrap"></div>
+
+    <h3>Registers <span class="muted">(pipelined CPU)</span></h3>
+    <div id="pipe-regs" class="cells cells-8"></div>
+  </section>
+
+  <!-- Comparison -->
+  <section class="panel wide" id="compare">
+    <div class="panel-head">
+      <h2>Single-cycle vs pipelined</h2>
+      <div class="row">
+        <button id="compare-btn">Compare all example programs</button>
+      </div>
+    </div>
+    <p class="muted small">
+      Clock periods use the textbook stage delays (IF 200 ps, ID 100 ps, EX 200 ps, MEM 200 ps, WB 100 ps):
+      single-cycle clock = 800 ps (slowest instruction), pipelined clock = 200 ps (slowest stage).
+      Execution time = cycles × clock period.
+    </p>
+    <div id="compare-out"></div>
+  </section>
 
   <script type="module" src="src/main.js"></script>
 </body>
